@@ -1,0 +1,213 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ */
+/*  Design tokens                                                      */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f6f6f6;
+  --surface-subtle: #eeeeee;
+  --surface-elevated: #ffffff;
+  --border: #e2e2e2;
+  --border-strong: #cfcfcf;
+  --text: #000000;
+  --text-secondary: #545454;
+  --text-muted: #757575;
+  --inverse-bg: #000000;
+  --inverse-text: #ffffff;
+
+  --positive: #06c167;
+  --negative: #e11900;
+  --warning: #ffc043;
+  --info: #276ef1;
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+.dark {
+  --bg: #000000;
+  --surface: #141414;
+  --surface-subtle: #1f1f1f;
+  --surface-elevated: #1f1f1f;
+  --border: #2e2e2e;
+  --border-strong: #3d3d3d;
+  --text: #ffffff;
+  --text-secondary: #b5b5b5;
+  --text-muted: #8a8a8a;
+  --inverse-bg: #ffffff;
+  --inverse-text: #000000;
+
+  --positive: #1fd37f;
+  --negative: #ff5247;
+  --warning: #ffc043;
+  --info: #5b91f5;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-subtle: var(--surface-subtle);
+  --color-elevated: var(--surface-elevated);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-ink-2: var(--text-secondary);
+  --color-ink-3: var(--text-muted);
+  --color-inverse: var(--inverse-bg);
+  --color-on-inverse: var(--inverse-text);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+
+  --radius-token: var(--radius);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base                                                               */
+/* ------------------------------------------------------------------ */
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid var(--bg);
+}
+
+/* Rich text rendered from the CMS */
+.prose-cms p {
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+.prose-cms h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 2rem 0 0.75rem;
+  color: var(--text);
+}
+.prose-cms h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--text);
+}
+.prose-cms ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+.prose-cms li {
+  margin-bottom: 0.375rem;
+}
+.prose-cms strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Grid backdrop used on marketing surfaces */
+.grid-backdrop {
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-subtle) 37%, var(--surface) 63%);
+  background-size: 400% 100%;
+  animation: skeleton 1.4s ease infinite;
+}
+
+@keyframes skeleton {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+.live-dot {
+  animation: pulse-dot 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
