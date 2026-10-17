@@ -1,39 +1,47 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Inter } from "next/font/google";
-
 import { Providers } from "@/components/providers";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
+import "./auth.css";
+import "./portal.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://meridian-capital.example.com"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://northline.co.za",
+  ),
   title: {
-    default: "Meridian Capital Partners — Managed trading, transparently reported",
-    template: "%s · Meridian Capital Partners",
+    default: "Northline | A clearer view of your capital",
+    template: "%s | Northline",
   },
   description:
-    "Meridian Capital Partners trades on behalf of its clients. Professional traders, a live client portal, and transparent reporting on every position.",
+    "Professional trading, transparent reporting and a direct line of sight to your capital. A more considered way forward.",
   openGraph: {
     type: "website",
-    siteName: "Meridian Capital Partners",
-    title: "Meridian Capital Partners — Managed trading, transparently reported",
-    description:
-      "Professional traders managing client capital, with a live portal showing balance, activity and trader performance.",
+    siteName: "Northline",
+    title: "Northline | A clearer view of your capital",
+    description: "Professional trading with a clearer perspective.",
+    images: [
+      {
+        url: "/images/hero-city.jpg",
+        width: 1600,
+        height: 900,
+        alt: "Cape Town at dusk",
+      },
+    ],
   },
   twitter: { card: "summary_large_image" },
   robots: { index: true, follow: true },
 };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#15121F",
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
-      <body className="min-h-dvh bg-bg text-ink antialiased">
+    <html lang="en-ZA" suppressHydrationWarning>
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>

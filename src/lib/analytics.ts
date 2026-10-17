@@ -1,116 +1,56 @@
-import type { Transaction } from "@/db/schema";
+import type { DashboardData } from "@/lib/types";
 
-export type RangeKey = "24h" | "7d" | "30d" | "90d" | "all";
+export type Range = "24h" | "7d" | "30d" | "90d" | "all";
+const daysFor: Record<Range, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, all: 3650 };
+const dayKey = (value: Date | string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
+const label = (key: string) => new Intl.DateTimeFormat("en-ZA", { timeZone: "Africa/Johannesburg", day: "numeric", month: "short" }).format(new Date(`${key}T12:00:00Z`));
 
-export const RANGES: { key: RangeKey; label: string; days: number }[] = [
-  { key: "24h", label: "24h", days: 1 },
-  { key: "7d", label: "7d", days: 7 },
-  { key: "30d", label: "30d", days: 30 },
-  { key: "90d", label: "90d", days: 90 },
-  { key: "all", label: "All", days: 3650 },
-];
-
-export function rangeDays(range: RangeKey) {
-  return RANGES.find((item) => item.key === range)?.days ?? 30;
+export function getMetrics(data: DashboardData) {
+  const current = data.accounts.reduce((sum, account) => sum + Number(account.balance), 0);
+  const deposited = data.transactions.filter((t) => t.type === "deposit").reduce((sum, t) => sum + Number(t.amount), 0);
+  const withdrawn = data.transactions.filter((t) => t.type === "withdrawal").reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+  const profit = data.transactions.filter((t) => ["trade_outcome", "adjustment"].includes(t.type)).reduce((sum, t) => sum + Number(t.amount), 0);
+  const closed = data.trades.filter((t) => t.status === "closed");
+  const wins = closed.filter((t) => Number(t.pnl) > 0).length;
+  return { current, deposited, withdrawn, profit, returnRate: deposited ? profit / deposited * 100 : 0, clients: data.people.filter((p) => p.role === "client").length, traders: data.people.filter((p) => p.role === "trader").length, pending: data.withdrawals.filter((w) => w.status === "pending").length, openFeedback: data.feedback.filter((f) => f.status !== "resolved").length, totalTrades: data.trades.length, winRate: closed.length ? wins / closed.length * 100 : 0, todayPnl: data.trades.filter((t) => dayKey(t.closedAt || t.openedAt) === dayKey(new Date())).reduce((sum, t) => sum + Number(t.pnl), 0), transactionCount: data.transactions.length };
 }
 
-function dayKey(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function shortLabel(iso: string) {
-  const date = new Date(`${iso}T00:00:00Z`);
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
-}
-
-export type SeriesPoint = { label: string; value: number };
-
-/** Daily closing balance series derived from ledger entries. */
-export function buildBalanceSeries(
-  rows: Pick<Transaction, "createdAt" | "balanceAfter">[],
-  currentBalance: number,
-  days: number,
-): SeriesPoint[] {
-  const sorted = [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  const byDay = new Map<string, number>();
-  for (const row of sorted) byDay.set(dayKey(row.createdAt), row.balanceAfter);
-
-  const points: SeriesPoint[] = [];
-  const span = Math.min(days, 180);
-  let running = sorted.length ? sorted[0].balanceAfter : currentBalance;
-
-  for (let i = span - 1; i >= 0; i -= 1) {
-    const date = new Date();
-    date.setUTCHours(0, 0, 0, 0);
-    date.setUTCDate(date.getUTCDate() - i);
+export function getChartData(data: DashboardData, range: Range) {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - daysFor[range] * 86400000);
+  const all = [...data.transactions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const filtered = range === "all" ? all : all.filter((t) => new Date(t.createdAt) >= cutoff);
+  const groups = new Map<string, { key: string; name: string; deposits: number; withdrawals: number; trades: number; actions: number; net: number }>();
+  const count = range === "all" ? Math.min(120, Math.max(7, Math.ceil((now.getTime() - new Date(all[0]?.createdAt || now).getTime()) / 86400000) + 1)) : daysFor[range];
+  for (let i = count - 1; i >= 0; i--) {
+    const date = new Date(now.getTime() - i * 86400000);
     const key = dayKey(date);
-    const value = byDay.get(key);
-    if (value !== undefined) running = value;
-    points.push({ label: shortLabel(key), value: Math.round(running * 100) / 100 });
+    groups.set(key, { key, name: label(key), deposits: 0, withdrawals: 0, trades: 0, actions: 0, net: 0 });
   }
-
-  if (points.length) points[points.length - 1].value = Math.round(currentBalance * 100) / 100;
-  return points;
-}
-
-export type ActivityPoint = { label: string; deposits: number; withdrawals: number; trades: number };
-
-export function buildDailyActivity(rows: Transaction[], days = 14): ActivityPoint[] {
-  const buckets = new Map<string, ActivityPoint>();
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date();
-    date.setUTCHours(0, 0, 0, 0);
-    date.setUTCDate(date.getUTCDate() - i);
-    const key = dayKey(date);
-    buckets.set(key, { label: shortLabel(key), deposits: 0, withdrawals: 0, trades: 0 });
+  for (const t of filtered) {
+    const group = groups.get(dayKey(t.createdAt));
+    if (!group) continue;
+    group.actions += 1;
+    group.net += Number(t.amount);
+    if (t.type === "deposit") group.deposits += Number(t.amount);
+    if (t.type === "withdrawal") group.withdrawals += Math.abs(Number(t.amount));
+    if (t.type === "trade_outcome") group.trades += Number(t.amount);
   }
-
-  for (const row of rows) {
-    const bucket = buckets.get(dayKey(row.createdAt));
-    if (!bucket) continue;
-    if (row.type === "deposit") bucket.deposits += Math.abs(row.amount);
-    else if (row.type === "withdrawal") bucket.withdrawals += Math.abs(row.amount);
-    else bucket.trades += 1;
-  }
-
-  return [...buckets.values()];
-}
-
-export function typeDistribution(rows: Transaction[]) {
-  const counts = { deposit: 0, withdrawal: 0, trade_outcome: 0, adjustment: 0 };
-  for (const row of rows) counts[row.type as keyof typeof counts] += 1;
-  return [
-    { name: "Deposits", value: counts.deposit, tone: "positive" as const },
-    { name: "Withdrawals", value: counts.withdrawal, tone: "negative" as const },
-    { name: "Trade outcomes", value: counts.trade_outcome, tone: "info" as const },
-    { name: "Adjustments", value: counts.adjustment, tone: "warning" as const },
+  const startBalance = data.accounts.reduce((sum, a) => sum + Number(a.balance), 0) - filtered.reduce((sum, t) => sum + Number(t.amount), 0);
+  let running = startBalance;
+  const timeline = [...groups.values()].map((group) => { running += group.net; return { ...group, balance: Math.round(running * 100) / 100, deposits: Math.round(group.deposits), withdrawals: Math.round(group.withdrawals) }; });
+  const types = [
+    { name: "Deposits", value: filtered.filter((t) => t.type === "deposit").length, color: "#5B2EE8" },
+    { name: "Trade outcomes", value: filtered.filter((t) => t.type === "trade_outcome").length, color: "#8FC9F2" },
+    { name: "Withdrawals", value: filtered.filter((t) => t.type === "withdrawal").length, color: "#A789F4" },
+    { name: "Adjustments", value: filtered.filter((t) => t.type === "adjustment").length, color: "#D8CEEA" },
   ].filter((item) => item.value > 0);
+  return { timeline, types, filtered, updatedAt: data.accounts.reduce((latest, a) => a.updatedAt > latest ? a.updatedAt : latest, data.accounts[0]?.updatedAt || now.toISOString()) };
 }
 
-export function filterByRange<T extends { createdAt: Date }>(rows: T[], range: RangeKey): T[] {
-  if (range === "all") return rows;
-  const cutoff = Date.now() - rangeDays(range) * 24 * 60 * 60 * 1000;
-  return rows.filter((row) => row.createdAt.getTime() >= cutoff);
-}
-
-export function tradeStats(trades: { pnl: number; status: string }[]) {
-  const closed = trades.filter((trade) => trade.status !== "open");
-  const wins = closed.filter((trade) => trade.pnl > 0);
-  const losses = closed.filter((trade) => trade.pnl < 0);
-  const grossProfit = wins.reduce((sum, trade) => sum + trade.pnl, 0);
-  const grossLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.pnl, 0));
-  return {
-    total: trades.length,
-    closed: closed.length,
-    open: trades.length - closed.length,
-    wins: wins.length,
-    losses: losses.length,
-    winRate: closed.length ? (wins.length / closed.length) * 100 : 0,
-    avgWin: wins.length ? grossProfit / wins.length : 0,
-    avgLoss: losses.length ? grossLoss / losses.length : 0,
-    best: closed.reduce((max, trade) => Math.max(max, trade.pnl), 0),
-    worst: closed.reduce((min, trade) => Math.min(min, trade.pnl), 0),
-    netPnl: closed.reduce((sum, trade) => sum + trade.pnl, 0),
-    profitFactor: grossLoss ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0,
-  };
+export function downloadCsv(filename: string, headers: string[], rows: (string | number | null | undefined)[][]) {
+  const escape = (value: string | number | null | undefined) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a"); link.href = url; link.download = `${filename}.csv`; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

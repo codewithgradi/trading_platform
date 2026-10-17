@@ -1,225 +1,78 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  accounts,
-  feedback,
-  notifications,
-  profiles,
-  traderClients,
-  trades,
-  transactions,
-  withdrawalRequests,
-} from "@/db/schema";
+import { accounts, auditLog, cmsDocuments, cmsVersions, contactSubmissions, customerNotes, faqs, feedback, feedbackMessages, notifications, profiles, teamMembers, testimonials, tradeAllocations, traderClients, trades, transactions, withdrawalRequests } from "@/db/schema";
+import { defaultContent, fallbackFaqs, fallbackTeam, fallbackTestimonials, type PublicContent } from "@/lib/content";
+import type { DashboardData } from "@/lib/types";
 
-export async function getAccount(clientId: string) {
-  const [row] = await db.select().from(accounts).where(eq(accounts.clientId, clientId)).limit(1);
-  return row ?? null;
+type ProfileRecord = typeof profiles.$inferSelect;
+export async function getPublicContent() {
+  const content: PublicContent = structuredClone(defaultContent);
+  let faqItems = fallbackFaqs.map(({ id, question, answer }) => ({ id, question, answer }));
+  let quotes = fallbackTestimonials;
+  let team = fallbackTeam;
+  try {
+    const [docs, faqRows, quoteRows, teamRows] = await Promise.all([
+      db.select().from(cmsDocuments),
+      db.select().from(faqs).where(eq(faqs.status, "published")).orderBy(faqs.sortOrder),
+      db.select().from(testimonials).where(eq(testimonials.status, "published")).orderBy(testimonials.sortOrder),
+      db.select().from(teamMembers).where(eq(teamMembers.status, "published")).orderBy(teamMembers.sortOrder),
+    ]);
+    for (const doc of docs) {
+      if (doc.key in content) {
+        const key = doc.key as keyof PublicContent;
+        Object.assign(content[key], doc.published);
+      }
+    }
+    if (faqRows.length) faqItems = faqRows.map((item) => ({ id: item.id, question: item.question, answer: item.answer }));
+    if (quoteRows.length) quotes = quoteRows.map((item) => ({ id: item.id, quote: item.quote, name: item.name, role: item.role, rating: item.rating, avatarUrl: item.avatarUrl || "" }));
+    if (teamRows.length) team = teamRows.map((item) => ({ id: item.id, name: item.name, role: item.role, bio: item.bio || "", avatarUrl: item.avatarUrl || "" }));
+  } catch { /* Default published content is available before first migration or seed. */ }
+  return { content, faqs: faqItems, testimonials: quotes, team };
 }
 
-export async function getClientTransactions(clientId: string, limit = 400) {
-  return db
-    .select()
-    .from(transactions)
-    .where(eq(transactions.clientId, clientId))
-    .orderBy(desc(transactions.createdAt))
-    .limit(limit);
-}
-
-export async function getClientWithdrawals(clientId: string) {
-  return db
-    .select()
-    .from(withdrawalRequests)
-    .where(eq(withdrawalRequests.clientId, clientId))
-    .orderBy(desc(withdrawalRequests.createdAt));
-}
-
-export async function getClientFeedback(clientId: string) {
-  return db
-    .select()
-    .from(feedback)
-    .where(eq(feedback.clientId, clientId))
-    .orderBy(desc(feedback.createdAt));
-}
-
-export async function getNotifications(userId: string, limit = 100) {
-  return db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.userId, userId))
-    .orderBy(desc(notifications.createdAt))
-    .limit(limit);
-}
-
-export type ClientRow = {
-  id: string;
-  fullName: string;
-  email: string;
-  phone: string | null;
-  avatarUrl: string | null;
-  status: string;
-  createdAt: Date;
-  balance: number;
-  currency: string;
-  totalDeposited: number;
-  totalWithdrawn: number;
-  updatedAt: Date;
-};
-
-export async function getTraderClients(traderId: string): Promise<ClientRow[]> {
-  const rows = await db
-    .select({
-      id: profiles.id,
-      fullName: profiles.fullName,
-      email: profiles.email,
-      phone: profiles.phone,
-      avatarUrl: profiles.avatarUrl,
-      status: profiles.status,
-      createdAt: profiles.createdAt,
-      balance: accounts.balance,
-      currency: accounts.currency,
-      totalDeposited: accounts.totalDeposited,
-      totalWithdrawn: accounts.totalWithdrawn,
-      updatedAt: accounts.updatedAt,
-    })
-    .from(traderClients)
-    .innerJoin(profiles, eq(profiles.id, traderClients.clientId))
-    .leftJoin(accounts, eq(accounts.clientId, traderClients.clientId))
-    .where(eq(traderClients.traderId, traderId))
-    .orderBy(desc(accounts.balance));
-
-  return rows.map((row) => ({
-    ...row,
-    balance: row.balance ?? 0,
-    currency: row.currency ?? "USD",
-    totalDeposited: row.totalDeposited ?? 0,
-    totalWithdrawn: row.totalWithdrawn ?? 0,
-    updatedAt: row.updatedAt ?? row.createdAt,
-  }));
-}
-
-export async function getTraderClientIds(traderId: string) {
-  const rows = await db
-    .select({ clientId: traderClients.clientId })
-    .from(traderClients)
-    .where(eq(traderClients.traderId, traderId));
-  return rows.map((row) => row.clientId);
-}
-
-export async function getTransactionsForClients(clientIds: string[], since?: Date) {
-  if (!clientIds.length) return [];
-  return db
-    .select()
-    .from(transactions)
-    .where(
-      since
-        ? and(inArray(transactions.clientId, clientIds), gte(transactions.createdAt, since))
-        : inArray(transactions.clientId, clientIds),
-    )
-    .orderBy(desc(transactions.createdAt))
-    .limit(1000);
-}
-
-export async function getTraderTrades(traderId: string) {
-  return db.select().from(trades).where(eq(trades.traderId, traderId)).orderBy(desc(trades.openedAt));
-}
-
-export async function getWithdrawalQueue(clientIds: string[]) {
-  if (!clientIds.length) return [];
-  return db
-    .select({
-      request: withdrawalRequests,
-      client: { id: profiles.id, fullName: profiles.fullName, email: profiles.email },
-      balance: accounts.balance,
-    })
-    .from(withdrawalRequests)
-    .innerJoin(profiles, eq(profiles.id, withdrawalRequests.clientId))
-    .leftJoin(accounts, eq(accounts.clientId, withdrawalRequests.clientId))
-    .where(inArray(withdrawalRequests.clientId, clientIds))
-    .orderBy(desc(withdrawalRequests.createdAt));
-}
-
-export async function getFeedbackForClients(clientIds: string[]) {
-  if (!clientIds.length) return [];
-  return db
-    .select({
-      item: feedback,
-      client: { id: profiles.id, fullName: profiles.fullName, email: profiles.email },
-    })
-    .from(feedback)
-    .innerJoin(profiles, eq(profiles.id, feedback.clientId))
-    .where(inArray(feedback.clientId, clientIds))
-    .orderBy(desc(feedback.createdAt));
-}
-
-export async function getPlatformSnapshot() {
-  const [[totals], [userCounts], [pending]] = await Promise.all([
-    db
-      .select({
-        aum: sql<number>`coalesce(sum(${accounts.balance}), 0)::float8`,
-        deposited: sql<number>`coalesce(sum(${accounts.totalDeposited}), 0)::float8`,
-        withdrawn: sql<number>`coalesce(sum(${accounts.totalWithdrawn}), 0)::float8`,
-        accounts: sql<number>`count(*)::int`,
-      })
-      .from(accounts),
-    db
-      .select({
-        admins: sql<number>`count(*) filter (where ${profiles.role} = 'admin')::int`,
-        traders: sql<number>`count(*) filter (where ${profiles.role} = 'trader')::int`,
-        clients: sql<number>`count(*) filter (where ${profiles.role} = 'client')::int`,
-        suspended: sql<number>`count(*) filter (where ${profiles.status} = 'suspended')::int`,
-        newThisMonth: sql<number>`count(*) filter (where ${profiles.createdAt} > now() - interval '30 days')::int`,
-      })
-      .from(profiles),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(withdrawalRequests)
-      .where(eq(withdrawalRequests.status, "pending")),
+export async function getDashboardData(me: ProfileRecord): Promise<DashboardData> {
+  const role = me.role;
+  const allAssignments = role === "admin" ? await db.select().from(traderClients) : role === "trader" ? await db.select().from(traderClients).where(eq(traderClients.traderId, me.id)) : await db.select().from(traderClients).where(eq(traderClients.clientId, me.id));
+  const clientIds = role === "client" ? [me.id] : role === "admin" ? (await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.role, "client"))).map((item) => item.id) : allAssignments.map((item) => item.clientId);
+  const peopleIds = role === "client" ? [me.id, ...allAssignments.map((a) => a.traderId)] : role === "trader" ? [me.id, ...clientIds] : [];
+  const personRows = role === "admin" ? await db.select().from(profiles).orderBy(desc(profiles.createdAt)) : await db.select().from(profiles).where(inArray(profiles.id, peopleIds));
+  const [accountRows, transactionRows, withdrawalRows, tradeRows, notifRows, feedbackRows, auditRows, contactRows, cmsRows, faqRows, quoteRows, teamRows, versionRows, noteRows] = await Promise.all([
+    clientIds.length ? db.select().from(accounts).where(inArray(accounts.clientId, clientIds)) : Promise.resolve([]),
+    clientIds.length ? db.select().from(transactions).where(inArray(transactions.clientId, clientIds)).orderBy(desc(transactions.createdAt)).limit(3000) : Promise.resolve([]),
+    role === "admin" ? db.select().from(withdrawalRequests).orderBy(desc(withdrawalRequests.createdAt)) : clientIds.length ? db.select().from(withdrawalRequests).where(inArray(withdrawalRequests.clientId, clientIds)).orderBy(desc(withdrawalRequests.createdAt)) : Promise.resolve([]),
+    role === "admin" ? db.select().from(trades).orderBy(desc(trades.openedAt)).limit(500) : role === "trader" ? db.select().from(trades).where(eq(trades.traderId, me.id)).orderBy(desc(trades.openedAt)).limit(500) : Promise.resolve([]),
+    db.select().from(notifications).where(eq(notifications.userId, me.id)).orderBy(desc(notifications.createdAt)).limit(100),
+    role === "admin" ? db.select().from(feedback).orderBy(desc(feedback.createdAt)) : clientIds.length ? db.select().from(feedback).where(inArray(feedback.clientId, clientIds)).orderBy(desc(feedback.createdAt)) : Promise.resolve([]),
+    role === "admin" ? db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(300) : role === "trader" ? db.select().from(auditLog).where(eq(auditLog.actorId, me.id)).orderBy(desc(auditLog.createdAt)).limit(80) : Promise.resolve([]),
+    role === "admin" ? db.select().from(contactSubmissions).orderBy(desc(contactSubmissions.createdAt)).limit(200) : Promise.resolve([]),
+    role === "admin" ? db.select().from(cmsDocuments) : Promise.resolve([]),
+    role === "admin" ? db.select().from(faqs).orderBy(faqs.sortOrder) : Promise.resolve([]),
+    role === "admin" ? db.select().from(testimonials).orderBy(testimonials.sortOrder) : Promise.resolve([]),
+    role === "admin" ? db.select().from(teamMembers).orderBy(teamMembers.sortOrder) : Promise.resolve([]),
+    role === "admin" ? db.select().from(cmsVersions).orderBy(desc(cmsVersions.createdAt)).limit(40) : Promise.resolve([]),
+    clientIds.length && role !== "admin" ? db.select().from(customerNotes).where(inArray(customerNotes.clientId, clientIds)).orderBy(desc(customerNotes.createdAt)).limit(200) : role === "admin" ? db.select().from(customerNotes).orderBy(desc(customerNotes.createdAt)).limit(200) : Promise.resolve([]),
   ]);
-
-  return { totals, userCounts, pendingWithdrawals: pending?.count ?? 0 };
-}
-
-export async function getAllTransactions(since?: Date) {
-  return db
-    .select()
-    .from(transactions)
-    .where(since ? gte(transactions.createdAt, since) : undefined)
-    .orderBy(desc(transactions.createdAt))
-    .limit(2000);
-}
-
-export async function getTraderLeaderboard() {
-  const rows = await db
-    .select({
-      traderId: profiles.id,
-      traderName: profiles.fullName,
-      clients: sql<number>`count(distinct ${traderClients.clientId})::int`,
-      aum: sql<number>`coalesce(sum(${accounts.balance}), 0)::float8`,
-    })
-    .from(profiles)
-    .leftJoin(traderClients, eq(traderClients.traderId, profiles.id))
-    .leftJoin(accounts, eq(accounts.clientId, traderClients.clientId))
-    .where(eq(profiles.role, "trader"))
-    .groupBy(profiles.id, profiles.fullName);
-
-  const tradeRows = await db
-    .select({
-      traderId: trades.traderId,
-      netPnl: sql<number>`coalesce(sum(${trades.pnl}), 0)::float8`,
-      total: sql<number>`count(*)::int`,
-      wins: sql<number>`count(*) filter (where ${trades.pnl} > 0)::int`,
-    })
-    .from(trades)
-    .groupBy(trades.traderId);
-
-  return rows.map((row) => {
-    const stats = tradeRows.find((trade) => trade.traderId === row.traderId);
-    return {
-      ...row,
-      netPnl: stats?.netPnl ?? 0,
-      trades: stats?.total ?? 0,
-      winRate: stats && stats.total ? (stats.wins / stats.total) * 100 : 0,
-    };
-  });
+  const messageRows = feedbackRows.length ? await db.select().from(feedbackMessages).where(inArray(feedbackMessages.feedbackId, feedbackRows.map((f) => f.id))).orderBy(feedbackMessages.createdAt) : [];
+  const allocationRows = tradeRows.length ? await db.select().from(tradeAllocations).where(inArray(tradeAllocations.tradeId, tradeRows.map((t) => t.id))) : [];
+  return JSON.parse(JSON.stringify({
+    me: { id: me.id, role: me.role, fullName: me.fullName, email: me.email, phone: me.phone, avatarUrl: me.avatarUrl, theme: me.theme, onboardingCompleted: me.onboardingCompleted, status: me.status, notificationPreferences: me.notificationPreferences },
+    people: personRows.map((p) => ({ id: p.id, role: p.role, fullName: p.fullName, email: p.email, phone: p.phone, avatarUrl: p.avatarUrl, status: p.status, createdAt: p.createdAt })),
+    assignments: allAssignments.map((a) => ({ clientId: a.clientId, traderId: a.traderId })),
+    accounts: accountRows,
+    transactions: transactionRows,
+    withdrawals: withdrawalRows,
+    trades: tradeRows,
+    allocations: allocationRows,
+    notifications: notifRows,
+    feedback: feedbackRows,
+    messages: messageRows,
+    audits: auditRows,
+    contacts: contactRows,
+    cms: cmsRows,
+    faqs: faqRows,
+    testimonials: quoteRows,
+    team: teamRows,
+    versions: versionRows,
+    notes: noteRows,
+  })) as DashboardData;
 }

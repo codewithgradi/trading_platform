@@ -1,0 +1,2 @@
+import { Skeleton } from "@/components/ui/empty-state";
+export default function PortalLoading() { return <div className="portal-loading"><Skeleton className="skeleton-eyebrow" /><Skeleton className="skeleton-heading" /><div className="skeleton-stat-grid">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="skeleton-stat" />)}</div><div className="skeleton-chart-grid"><Skeleton className="skeleton-chart" /><Skeleton className="skeleton-chart" /></div></div>; }

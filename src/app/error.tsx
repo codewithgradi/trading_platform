@@ -1,29 +1,4 @@
 "use client";
-
-import { useEffect } from "react";
-
-export default function GlobalError({ error, reset }: { error: Error; reset: () => void }) {
-  useEffect(() => {
-    console.error("Unhandled application error", error);
-  }, [error]);
-
-  return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
-      <p className="tnum text-[13px] font-semibold uppercase tracking-[0.18em] text-ink-3">Error 500</p>
-      <h1 className="mt-4 text-[34px] font-bold leading-tight tracking-tight text-ink sm:text-[44px]">
-        Something went wrong on our side
-      </h1>
-      <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ink-2">
-        Your data is safe. Try again — if the problem persists, contact the desk and quote the time of the
-        error.
-      </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="mt-8 inline-flex h-11 items-center rounded-full bg-inverse px-6 text-sm font-medium text-on-inverse transition-opacity hover:opacity-85"
-      >
-        Try again
-      </button>
-    </main>
-  );
-}
+import Link from "next/link";
+import { ArrowLeft, RotateCcw, ShieldAlert } from "lucide-react";
+export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) { return <main className="min-h-screen flex items-center justify-center px-6 bg-[var(--bg)] text-[var(--text)]"><div className="max-w-xl w-full border border-[var(--border)] rounded-lg p-8 md:p-12 bg-[var(--card)]"><span className="text-[var(--brand)] text-xs font-bold tracking-[.15em]">NORTHLINE / SOMETHING WENT WRONG</span><div className="mt-7 w-14 h-14 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] grid place-items-center"><ShieldAlert size={25} /></div><h1 className="text-3xl font-bold tracking-[-.05em] mt-6">Let’s try that again.</h1><p className="text-sm text-[var(--secondary)] leading-7 mt-3">We could not load this page right now. Your account information has not been changed.</p><div className="flex flex-wrap gap-3 mt-7"><button className="button" onClick={reset}><RotateCcw size={15} /> Try again</button><Link href="/" className="button button-outline"><ArrowLeft size={15} /> Go home</Link></div></div></main>; }

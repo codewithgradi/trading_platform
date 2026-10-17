@@ -1,0 +1,23 @@
+export type Role = "admin" | "trader" | "client";
+export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
+export type DashboardData = {
+  me: { id: string; role: string; fullName: string; email: string; phone: string | null; avatarUrl: string | null; theme: string; onboardingCompleted: boolean; status: string; notificationPreferences: { email: boolean; inApp: boolean } | null };
+  people: { id: string; role: string; fullName: string; email: string; phone: string | null; avatarUrl: string | null; status: string; createdAt: string }[];
+  assignments: { clientId: string; traderId: string }[];
+  accounts: { clientId: string; balance: string; updatedAt: string }[];
+  transactions: { id: string; clientId: string; traderId: string | null; type: string; amount: string; balanceBefore: string; balanceAfter: string; note: string | null; reference: string | null; status: string; createdAt: string }[];
+  withdrawals: { id: string; clientId: string; amount: string; status: string; note: string | null; reason: string | null; reviewedBy: string | null; createdAt: string; reviewedAt: string | null; processedAt: string | null }[];
+  trades: { id: string; traderId: string; instrument: string; direction: string; size: string; entry: string; exit: string | null; pnl: string; status: string; notes: string | null; openedAt: string; closedAt: string | null }[];
+  allocations: { id: string; tradeId: string; clientId: string; amount: string }[];
+  notifications: { id: string; userId: string; type: string; title: string; body: string; data: Record<string, unknown> | null; readAt: string | null; createdAt: string }[];
+  feedback: { id: string; clientId: string; assignedTo: string | null; category: string; subject: string; message: string; status: string; priority: string; attachmentUrl: string | null; createdAt: string; updatedAt: string }[];
+  messages: { id: string; feedbackId: string; authorId: string; body: string; createdAt: string }[];
+  audits: { id: string; actorId: string | null; action: string; entity: string; entityId: string | null; before: Record<string, unknown> | null; after: Record<string, unknown> | null; createdAt: string }[];
+  contacts: { id: string; name: string; email: string; phone: string | null; message: string; status: string; createdAt: string }[];
+  cms: { key: string; published: Record<string, unknown>; draft: Record<string, unknown>; version: number; updatedAt: string }[];
+  faqs: { id: string; question: string; answer: string; status: string; sortOrder: number }[];
+  testimonials: { id: string; quote: string; name: string; role: string; avatarUrl: string | null; rating: number; status: string; sortOrder: number }[];
+  team: { id: string; name: string; role: string; bio: string | null; avatarUrl: string | null; status: string; sortOrder: number }[];
+  versions: { id: string; key: string; version: number; published: Record<string, unknown>; createdAt: string }[];
+  notes: { id: string; clientId: string; traderId: string; body: string; createdAt: string }[];
+};

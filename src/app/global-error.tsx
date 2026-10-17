@@ -1,0 +1,4 @@
+"use client";
+import { RotateCcw, ShieldAlert } from "lucide-react";
+import "./globals.css";
+export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) { return <html lang="en-ZA"><body><main className="min-h-screen flex items-center justify-center px-6 bg-[var(--bg)] text-[var(--text)]"><div className="max-w-lg w-full border border-[var(--border)] rounded-lg p-10 bg-[var(--card)]"><div className="w-12 h-12 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] grid place-items-center"><ShieldAlert size={23} /></div><h1 className="text-3xl font-bold tracking-[-.05em] mt-6">We’ll be right back.</h1><p className="text-sm text-[var(--secondary)] leading-7 mt-3">Northline is having trouble loading. Please try again in a moment.</p><button type="button" className="button mt-6" onClick={reset}><RotateCcw size={15} /> Try again</button></div></main></body></html>; }

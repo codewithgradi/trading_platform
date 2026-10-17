@@ -1,49 +1,20 @@
 "use client";
 
-import * as React from "react";
-import { useTheme } from "next-themes";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { updateThemePreference } from "@/app/theme-action";
 
-import { cn } from "@/lib/utils";
-
-export function ThemeToggle({
-  className,
-  onPersist,
-}: {
-  className?: string;
-  onPersist?: (theme: string) => void;
-}) {
+export function ThemeToggle({ onHero = false, loggedIn = false }: { onHero?: boolean; loggedIn?: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => setMounted(true), []);
-
-  const isDark = mounted && resolvedTheme === "dark";
-
-  return (
-    <button
-      type="button"
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      onClick={() => {
-        const next = isDark ? "light" : "dark";
-        setTheme(next);
-        onPersist?.(next);
-      }}
-      className={cn(
-        "relative flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink transition-colors hover:bg-surface",
-        className,
-      )}
-    >
-      <motion.span
-        key={isDark ? "moon" : "sun"}
-        initial={{ opacity: 0, rotate: -70, scale: 0.6 }}
-        animate={{ opacity: 1, rotate: 0, scale: 1 }}
-        transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-        className="flex items-center justify-center"
-      >
-        {isDark ? <Moon className="h-4 w-4" strokeWidth={1.8} /> : <Sun className="h-4 w-4" strokeWidth={1.8} />}
-      </motion.span>
-    </button>
-  );
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const dark = mounted && resolvedTheme === "dark";
+  const toggle = () => {
+    const next = dark ? "light" : "dark";
+    setTheme(next);
+    if (loggedIn) void updateThemePreference(next);
+  };
+  return <button type="button" className={`theme-toggle ${onHero ? "theme-toggle-hero" : ""}`} onClick={toggle} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"} title={dark ? "Light mode" : "Dark mode"}><AnimatePresence mode="wait" initial={false}><motion.span key={dark ? "moon" : "sun"} initial={{ rotate: -70, opacity: 0, scale: .6 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} exit={{ rotate: 70, opacity: 0, scale: .6 }} transition={{ duration: .2 }} className="theme-toggle-icon">{dark ? <Moon size={18} strokeWidth={1.8} /> : <Sun size={18} strokeWidth={1.8} />}</motion.span></AnimatePresence></button>;
 }

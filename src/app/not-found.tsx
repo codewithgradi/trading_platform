@@ -1,29 +1,5 @@
 import Link from "next/link";
-
-export default function NotFound() {
-  return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
-      <p className="tnum text-[13px] font-semibold uppercase tracking-[0.18em] text-ink-3">Error 404</p>
-      <h1 className="mt-4 text-[38px] font-bold leading-tight tracking-tight text-ink sm:text-[48px]">
-        We couldn&apos;t find that page
-      </h1>
-      <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ink-2">
-        The link may be out of date, or the page may have moved. Everything else is working normally.
-      </p>
-      <div className="mt-8 flex gap-3">
-        <Link
-          href="/"
-          className="inline-flex h-11 items-center rounded-full bg-inverse px-6 text-sm font-medium text-on-inverse transition-opacity hover:opacity-85"
-        >
-          Back to home
-        </Link>
-        <Link
-          href="/login"
-          className="inline-flex h-11 items-center rounded-full border border-line-strong px-6 text-sm font-medium text-ink transition-colors hover:bg-surface"
-        >
-          Go to portal
-        </Link>
-      </div>
-    </main>
-  );
-}
+import { ArrowLeft, Compass } from "lucide-react";
+import { Brand } from "@/components/public/site-header";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+export default function NotFound() { return <main className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col"><header className="h-20 px-6 md:px-12 border-b border-[var(--border)] flex items-center justify-between"><Brand /><ThemeToggle /></header><div className="container flex-1 flex flex-col items-start justify-center py-20"><span className="text-[var(--brand)] text-xs font-bold tracking-[.17em]">NORTHLINE / 404</span><div className="mt-8 w-16 h-16 rounded-full grid place-items-center bg-[var(--brand-tint)] text-[var(--brand)]"><Compass size={28} strokeWidth={1.5} /></div><h1 className="mt-7 text-4xl md:text-6xl font-bold tracking-[-.055em]">A different direction.</h1><p className="mt-2 text-sm text-[var(--secondary)] max-w-md leading-8">We could not find the page you were looking for. Let’s get you back to a clearer view.</p><Link href="/" className="button mt-7"><ArrowLeft size={16} /> Back to home</Link></div><footer className="px-6 md:px-12 py-6 border-t border-[var(--border)] text-xs text-[var(--muted)]">Northline · A clearer view of your capital.</footer></main>; }
